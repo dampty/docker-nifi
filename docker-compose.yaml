@@ -1,0 +1,99 @@
+version: "3.8"
+services:
+  # configuration manager for NiFi
+  zookeeper:
+    image: 'bitnami/zookeeper:3.7.0' # latest image as of 2021-11-09.
+    container_name: zookeeper-sandbox
+    hostname: zookeeper-sandbox
+    restart: on-failure
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - dev-net
+
+  nifi_registry_sandbox:
+    image: apache/nifi-registry:1.18.0
+    container_name: nifi-registry-sandbox
+    hostname: nifi-registry-sandbox
+    #privileged: true
+    #restart: on-failure
+    # THIS BIT!!!1!
+    #user: ${CURRENT_UID}
+    ports:
+      - 18080:18080
+    cpus: 1
+    mem_limit: 1G
+    mem_reservation: 1G
+    environment:
+      - LOG_LEVEL=INFO
+      - NIFI_REGISTRY_DB_DIR=/opt/nifi-registry/nifi-registry-current/database
+      - NIFI_REGISTRY_FLOW_PROVIDER=file
+      - NIFI_REGISTRY_FLOW_STORAGE_DIR=/opt/nifi-registry/nifi-registry-current/flow_storage
+    volumes:
+      - ./nifi_registry/database:/opt/nifi-registry/nifi-registry-current/database
+      - ./nifi_registry/flow_storage:/opt/nifi-registry/nifi-registry-current/flow_storage
+    networks:
+      - dev-net
+
+  nifi_sandbox:
+    image: apache/nifi:1.18.0
+    container_name: nifi-sandbox
+    hostname: nifi-sandbox
+    #privileged: true
+    #restart: on-failure
+    # THIS BIT!!!1!
+    #user: ${CURRENT_UID}
+    ports:
+      - 8091:8080
+    cpus: 2
+    mem_limit: 2G
+    mem_reservation: 2G
+    environment:
+      - LOG_LEVEL=ERROR
+      - NIFI_WEB_HTTP_HOST=nifi-sandbox
+      - NIFI_WEB_HTTP_PORT=8080
+      - SINGLE_USER_CREDENTIALS_USERNAME=admin
+      - SINGLE_USER_CREDENTIALS_PASSWORD=MxjfWw3*sx37
+      - NIFI_SENSITIVE_PROPS_KEY=Gq@yuM&2Zrvy
+    volumes:
+      - ./nifi/database_repository:/opt/nifi/nifi-current/database_repository
+      - ./nifi/flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - ./nifi/content_repository:/opt/nifi/nifi-current/content_repository
+      - ./nifi/provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - ./nifi/state:/opt/nifi/nifi-current/state
+      - ./nifi/data:/opt/nifi/nifi-current/data
+      - ./nifi/logs:/opt/nifi/nifi-current/logs
+      # uncomment the next line after copying the /conf directory from the container to your local directory to persist NiFi flows
+      - ./conf:/opt/nifi/nifi-current/conf
+      - type: bind
+        source: ./drivers
+        target: /opt/nifi/nifi-current/drivers
+    healthcheck:
+      test: "${DOCKER_HEALTHCHECK_TEST:-curl localhost:8091/nifi/}"
+      interval: "60s"
+      timeout: "3s"
+      start_period: "5s"
+      retries: 5
+    networks:
+      - dev-net
+
+volumes:
+  database_repository:
+    driver: local
+  flowfile_repository:
+    driver: local
+  content_repository:
+    driver: local
+  provenance_repository:
+    driver: local
+  state:
+    driver: local
+  data:
+    driver: local
+  logs:
+    driver: local
+
+networks:
+  dev-net:
+    driver: bridge
+    external: true
